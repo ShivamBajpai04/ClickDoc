@@ -14,7 +14,7 @@ class doc_content:
 
 class LLMOutputData:
     document_content: doc_content
-    document_url: str
+    document_url: str  # optional
 
 
 class OutputConfluenceData:
@@ -25,7 +25,7 @@ class OutputConfluenceData:
 def read_file_and_make_html_to_string_without_newlines(file_path: str) -> str:
     with open(file_path, "r") as file:
         content = file.read()
-    return content.replace("\n", "")
+    return content
 
 
 SPACE_ID = "131074"
@@ -58,13 +58,13 @@ class ClickDocService:
 
         print(f"Publishing to Confluence with content: {content} at {url}")
         result = OutputConfluenceData()
-        url = None
+        result_url = None
         status = None
         if url == "" or url is None:
-            url, status = self.create_page(content)
+            result_url, status = self.create_page(content)
         else:
-            url, status = self.update_page(content, url)
-        result.confluence_link = url
+            result_url, status = self.update_page(content, url)
+        result.confluence_link = result_url
         result.publication_status = status
         return result
 
@@ -100,8 +100,79 @@ class ClickDocService:
         else:
             return "", f"failed with status code {response.status_code}"
 
-    def update_page(content: doc_content, page_url: str) -> tuple[str, str]:
-        pass
+    def update_page(self, content: doc_content, page_url: str) -> tuple[str, str]:
+        # Extract page ID from the URL
+        # Expected URL format: https://clickpost.atlassian.net/wiki/spaces/CR/pages/1547010049/Shreemaruti+Couriers+B2C+India
+        # Format: /spaces/{space_name}/pages/{id}/{title}
+        try:
+            if "/pages/" in page_url:
+                # Extract from URL path format: /spaces/SPACE/pages/PAGE_ID/title
+                parts = page_url.split("/pages/")
+                page_id = parts[1].split("/")[0]
+            else:
+                return (
+                    "",
+                    "URL must be in format: /spaces/{space_name}/pages/{id}/{title}",
+                )
+        except Exception as e:
+            return "", f"failed to parse page URL: {str(e)}"
+
+        # Get the current page to retrieve the version number
+        api_url = f"https://qrthing.atlassian.net/wiki/api/v2/pages/{page_id}"
+        headers = {
+            "Authorization": f"Basic {AUTH}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
+        get_response = requests.get(api_url, headers=headers)
+        if get_response.status_code != 200:
+            return (
+                "",
+                f"failed to get page details with status code {get_response.status_code}",
+            )
+
+        current_page_data = get_response.json()
+        current_version = current_page_data["version"]["number"]
+        print(
+            f"Current version of page {page_id} is {current_version}\n current_page_data = {current_page_data}"
+        )
+
+        # Prepare the update request body
+        request_body = {
+            "id": page_id,
+            "status": "draft",
+            "spaceId": current_page_data[
+                "spaceId"
+            ],  # Hard coded to push to a specific space
+            "title": content.title,
+            "body": {
+                "representation": "storage",
+                "value": content.body,
+            },
+            "version": {
+                "number": current_version,
+                "message": "Updated by ClickDoc",
+            },
+        }
+
+        # Make PUT request to update the page
+        update_response = requests.put(api_url, headers=headers, json=request_body)
+
+        if update_response.status_code == 200:
+            data = update_response.json()
+            links = data["_links"]
+            page_url_updated = links.get("webui", "")
+            base_url = links.get("base", "")
+            full_url = (
+                f"{base_url}{page_url_updated}" if base_url and page_url_updated else ""
+            )
+            return full_url, "updated_as_draft"
+        else:
+            return (
+                "",
+                f"failed to update page with status code {update_response.status_code} + {update_response.text}",
+            )
 
 
 def main():
@@ -117,7 +188,27 @@ def main():
     )
 
 
-main()
+def test_update_page():
+    """Test the update_page functionality"""
+    service = ClickDocService()
+    llm_data = LLMOutputData()
+    llm_data.document_content = doc_content()
+    llm_data.document_content.title = "Sample Title"
+    llm_data.document_content.body = DATA + "<p>Additional updated content.</p>"
+    # Use the example URL format provided
+    llm_data.document_url = (
+        "https://qrthing.atlassian.net/wiki/spaces/CP/pages/819201/Sample+Title"
+    )
+    response = service.publish_output_confulence(llm_data)
+    print(
+        f"Confluence update response: {response.confluence_link}, status: {response.publication_status}"
+    )
+
+
+# Uncomment the line below to test the update functionality
+test_update_page()
+
+# main()
 
 """
 Publishing to Confluence with content: <__main__.doc_content object at 0x0000019FEBDAB380> at None
