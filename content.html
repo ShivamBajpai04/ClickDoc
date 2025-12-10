@@ -1,0 +1,185 @@
+<h1>QRThing Shipment API Documentation</h1>
+
+<p>
+  This document provides details for integrating with the QRThing Shipment API.
+  You can use these endpoints to create, track, update, and cancel shipments.
+</p>
+
+<h2>Base URL</h2>
+
+<pre><code>https://api.qrthing.com/v1</code></pre>
+
+<h2>Authentication</h2>
+<p>All requests must include a valid API key in the header:</p>
+
+<pre><code>Authorization: Bearer &lt;api_token&gt;</code></pre>
+
+<hr />
+<h2>1. Create Shipment</h2>
+
+<p>Creates a new outbound shipment and returns the shipment ID.</p>
+
+<b>Endpoint</b>
+<pre><code>POST /shipments</code></pre>
+
+<b>Request</b>
+<pre><code>{
+  "orderId": "123456789",
+  "pickupAddress": {
+    "street": "221B Baker Street",
+    "city": "London",
+    "country": "UK"
+  },
+  "deliveryAddress": {
+    "street": "21 Jump Street",
+    "city": "LA",
+    "country": "USA"
+  }
+}
+</code></pre>
+
+<b>Response</b>
+<pre><code>{
+  "shipmentId": "ship_673820",
+  "status": "created",
+  "estimatedDelivery": "2025-07-08"
+}
+</code></pre>
+
+<hr />
+<h2>2. Track Shipment</h2>
+
+<p>Return the latest status of the shipment.</p>
+
+<b>Endpoint</b>
+<pre><code>GET /shipments/{shipmentId}/tracking</code></pre>
+
+<b>Response</b>
+<pre><code>{
+  "shipmentId": "ship_673820",
+  "status": "in_transit",
+  "lastLocation": "New York, JFK",
+  "updatedAt": "2025-07-08T15:22:00Z"
+}
+</code></pre>
+
+<hr />
+<h2>3. Cancel Shipment</h2>
+
+<p>Cancel an already created shipment (if possible).</p>
+
+<b>Endpoint</b>
+<pre><code>POST /shipments/{shipmentId}/cancel</code></pre>
+
+<b>Request</b>
+<pre><code>{
+  "reason": "customer_requested"
+}
+</code></pre>
+
+<b>Response</b>
+<pre><code>{
+  "shipmentId": "ship_673820",
+  "status": "cancelled"
+}
+</code></pre>
+
+<hr />
+<h2>4. Get Shipment Label</h2>
+
+<p>Generates a printable shipping label (PDF).</p>
+
+<b>Endpoint</b>
+<pre><code>GET /shipments/{shipmentId}/label</code></pre>
+
+<b>Response (PDF binary)</b>
+<pre><code>%PDF-1.1 ... (binary) ... %%EOF</code></pre>
+
+<hr />
+<h2>5. List Shipments</h2>
+
+<p>List shipments created within a given time window.</p>
+
+<b>Endpoint</b>
+<pre><code>GET /shipments?created_after=2025-07-01&amp;limit=50</code></pre>
+
+<b>Response</b>
+<pre><code>{
+  "total": 124,
+  "results": [
+    {
+      "shipmentId": "ship_673820",
+      "status": "in_transit"
+    },
+    {
+      "shipmentId": "ship_673821",
+      "status": "created"
+    }
+  ]
+}
+</code></pre>
+
+<hr />
+<h2>Error Schema</h2>
+
+<p>All endpoints may return the following error model:</p>
+
+<pre><code>{
+  "error": {
+    "code": "INVALID_REQUEST",
+    "message": "Pickup city is required"
+  }
+}
+</code></pre>
+
+<hr />
+<h2>HTTP Status Codes</h2>
+
+<table>
+  <tr>
+    <th>Status</th>
+    <th>Meaning</th>
+  </tr>
+  <tr>
+    <td>200</td>
+    <td>Success</td>
+  </tr>
+  <tr>
+    <td>201</td>
+    <td>Created</td>
+  </tr>
+  <tr>
+    <td>400</td>
+    <td>Bad Request</td>
+  </tr>
+  <tr>
+    <td>401</td>
+    <td>Unauthorized / Missing API Key</td>
+  </tr>
+  <tr>
+    <td>404</td>
+    <td>Not Found</td>
+  </tr>
+  <tr>
+    <td>500</td>
+    <td>Internal Server Error</td>
+  </tr>
+</table>
+
+<hr />
+<h2>Versioning</h2>
+
+<p>Use the <b>api-version</b> header to target a specific version.</p>
+<pre><code>api-version: 2025-05-01</code></pre>
+
+<p>If omitted, the latest stable version is used.</p>
+
+<hr />
+<h2>Support</h2>
+
+<p>Contact: <a href="mailto:support@qrthing.com">support@qrthing.com</a></p>
+
+<p>
+  For onboarding help, reach out on the internal Slack channel
+  #onboarding-support.
+</p>
